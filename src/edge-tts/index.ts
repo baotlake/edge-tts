@@ -1,0 +1,5 @@
+export * from './exceptions'
+export { Communicate } from './communicate'
+export { SubMaker } from './submaker'
+export { __version__, __version_info__ } from './version'
+export { listVoices, VoicesManager } from './voices'

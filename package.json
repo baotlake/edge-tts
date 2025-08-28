@@ -1,0 +1,45 @@
+{
+  "name": "edge-tts.js",
+  "version": "0.0.1",
+  "keywords": [
+    "tts",
+    "text-to-speech",
+    "edge-tts",
+    "cli"
+  ],
+  "description": "Use Microsoft Edge's online text-to-speech service from TypeScript / JavaScript WITHOUT needing Microsoft Edge or Windows or an API key",
+  "bin": {
+    "edge-tts": "bin/edge-tts.js"
+  },
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:bin": "tsup src/edge-tts/edge-tts.ts --format cjs --out-dir bin --clean --minify",
+    "build:pkg": "tsup src/edge-tts/index.ts --format cjs,esm --out-dir dist --dts --clean --minify",
+    "build": "npm run build:bin && npm run build:pkg",
+    "release": "npm run build && changeset publish",
+    "test": "vitest"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "dependencies": {
+    "@noble/hashes": "^2.0.0",
+    "@types/ws": "^8.18.1",
+    "cli-table3": "^0.6.5",
+    "commander": "^14.0.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.6",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/baotlake/edge-tts.git",
+    "directory": "src/edge-tts"
+  }
+}
