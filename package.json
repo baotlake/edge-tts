@@ -1,6 +1,6 @@
 {
   "name": "edge-tts.js",
-  "version": "0.0.1",
+  "version": "2.0.0",
   "keywords": [
     "tts",
     "text-to-speech",
@@ -25,7 +25,6 @@
     "dist"
   ],
   "dependencies": {
-    "@noble/hashes": "^2.0.0",
     "@types/ws": "^8.18.1",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.0",
@@ -33,6 +32,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.6",
+    "@noble/hashes": "^2.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
