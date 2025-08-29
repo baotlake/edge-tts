@@ -21,11 +21,10 @@ import type { CommunicateState, TTSChunk } from './typing'
 
 // Environment-agnostic WebSocket import
 // In Node.js, the 'ws' package is required.
-type WebSocket = typeof import('ws')
-const WebSocketImpl =
-  typeof window !== 'undefined'
-    ? window.WebSocket
-    : (async () => (await import('ws')).default)()
+const importWebSocket = async () => {
+  if (globalThis.WebSocket) return globalThis.WebSocket
+  return (await import('ws')).default
+}
 
 // --- Helper Functions ---
 
@@ -297,7 +296,7 @@ export function ssmlHeadersPlusData(
 export class Communicate {
   private tts_config: TTSConfig
   private texts: Generator<Uint8Array, void, unknown>
-  private proxy?: string | undefined
+  private proxy: string
   private state: CommunicateState
 
   constructor(
@@ -324,7 +323,7 @@ export class Communicate {
       escapeXml(removeIncompatibleCharacters(text)),
       4096,
     )
-    this.proxy = proxy
+    this.proxy = proxy || ''
     this.state = {
       partial_text: new Uint8Array(),
       offset_compensation: 0,
@@ -356,14 +355,13 @@ export class Communicate {
   }
 
   private async *_stream(): AsyncGenerator<TTSChunk, void, unknown> {
-    const url = new URL(WSS_URL)
+    const url = new URL(this.proxy + WSS_URL)
     url.searchParams.append('Sec-MS-GEC', DRM.generateSecMsGec())
     url.searchParams.append('Sec-MS-GEC-Version', SEC_MS_GEC_VERSION)
     url.searchParams.append('ConnectionId', connectId())
 
-    const WS =
-      typeof WebSocketImpl === 'function' ? WebSocketImpl : await WebSocketImpl
-    const websocket = new WS(url.toString(), undefined, {
+    const WebSocket = await importWebSocket()
+    const websocket = new WebSocket(url.toString(), undefined, {
       headers: WSS_HEADERS,
     })
 
@@ -371,7 +369,11 @@ export class Communicate {
 
     let audioWasReceived = false
 
-    let messageQueue: (MessageEvent | ErrorEvent | CloseEvent)[] = []
+    let messageQueue: (
+      | { type: 'message'; data: string | ArrayBuffer }
+      | { type: 'close'; code: number; reason: string }
+      | { type: 'error'; message: string }
+    )[] = []
     let waiter: ((value: void) => void) | null = null
 
     const waitForMessage = () => {
@@ -380,17 +382,19 @@ export class Communicate {
       })
     }
 
-    websocket.onmessage = (event: any) => {
-      messageQueue.push(event)
-      if (waiter) waiter()
+    websocket.onmessage = (e: MessageEvent) => {
+      messageQueue.push({ type: 'message', data: e.data })
+      waiter?.()
     }
-    websocket.onerror = (event: any) => {
-      messageQueue.push(event as ErrorEvent)
-      if (waiter) waiter()
+    websocket.onerror = (e: Event) => {
+      messageQueue.push({ type: 'error', message: (e as ErrorEvent).message })
+      waiter?.()
     }
-    websocket.onclose = (event: any) => {
-      messageQueue.push(event)
-      if (waiter) waiter()
+    websocket.onclose = (e: CloseEvent | number, reason?: string) => {
+      const code = e instanceof Event ? e.code : e
+      const _reason = e instanceof Event ? e.reason : reason || ''
+      messageQueue.push({ type: 'close', code: code, reason: _reason })
+      waiter?.()
     }
 
     try {
@@ -400,8 +404,8 @@ export class Communicate {
           return
         }
         websocket.onopen = () => resolve()
-        websocket.onerror = (err: any) =>
-          reject(new WebSocketError((err as ErrorEvent).message))
+        websocket.onerror = (e: Event) =>
+          reject(new WebSocketError((e as ErrorEvent).message))
       })
 
       // Send speech config
@@ -440,11 +444,9 @@ export class Communicate {
           await waitForMessage()
         }
         const event = messageQueue.shift()!
-
-        if (event instanceof MessageEvent) {
-          const message = event
-          if (typeof message.data === 'string') {
-            const data = textEncoder.encode(message.data)
+        if (event.type == 'message') {
+          if (typeof event.data === 'string') {
+            const data = textEncoder.encode(event.data)
 
             const separator = textEncoder.encode('\r\n\r\n')
             const headerLength = findSubarray(data, separator)
@@ -461,9 +463,9 @@ export class Communicate {
                 this.state.last_duration_offset + 8_750_000
               break
             }
-          } else if (message.data instanceof ArrayBuffer) {
+          } else if (event.data instanceof ArrayBuffer) {
             // FIX: This block is entirely rewritten for correct binary message parsing.
-            const data = new Uint8Array(message.data)
+            const data = new Uint8Array(event.data)
             if (data.length < 2) continue
 
             const headerLength = new DataView(data.buffer).getUint16(0, false)
@@ -492,14 +494,14 @@ export class Communicate {
               }
             }
           }
-        } else if (event instanceof CloseEvent) {
+        } else if (event.type == 'close') {
           if (event.code !== 1000 && event.code !== 1005) {
             throw new WebSocketError(
               `WebSocket closed abnormally: ${event.code} ${event.reason}`,
             )
           }
           break
-        } else if (event instanceof ErrorEvent) {
+        } else if (event.type == 'error') {
           throw new WebSocketError(`WebSocket error: ${event.message}`)
         }
       }
