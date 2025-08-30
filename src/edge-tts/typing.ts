@@ -19,7 +19,7 @@ interface BoundaryChunk {
  */
 interface AudioChunk {
   type: 'audio'
-  data: Uint8Array
+  data: Uint8Array<ArrayBuffer>
 }
 
 /**
