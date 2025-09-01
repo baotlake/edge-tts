@@ -18,12 +18,20 @@
     "build:pkg": "tsup src/edge-tts/index.ts --format cjs,esm --out-dir dist --dts --clean --minify",
     "build": "npm run build:bin && npm run build:pkg",
     "release": "npm run build && changeset publish",
+    "prepublishOnly": "mv README.md py.md && cp .github/README.md README.md",
+    "postpublish": "mv py.md README.md",
     "test": "vitest"
   },
   "files": [
     "bin",
     "dist"
   ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "dependencies": {
     "@types/ws": "^8.18.1",
     "cli-table3": "^0.6.5",
